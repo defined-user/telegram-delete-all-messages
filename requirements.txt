@@ -1,2 +1,4 @@
 pyrogram
-tgcrypto # Optional, for faster cleaning. You could remove this line
+# Optional dependency, used for faster cleaning
+tgcrypto 
+

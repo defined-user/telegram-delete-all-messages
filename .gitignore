@@ -3,3 +3,7 @@ __pycache__
 
 # User credentials
 *.session
+
+# User application credentials
+config.ini
+

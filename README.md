@@ -1,25 +1,32 @@
 # telegram-delete-all-messages
-Delete all your messages in supergroups with python script.
+Delete all your messages in groups and supergroups with python script.
 
 ## Installation
-To install this script you have to download project and install requirements:
+To use this script you have to download the project and install it's
+requirements. It's recommended to use a virtual environment, such as
+`venv` or `conda`. This example shows how to setup your project
+using `conda`:
 
 ### Linux
 ```
-git clone https://github.com/borontov/telegram-delete-all-messages
+# Create a new Python 3.8 environment
+conda create -n telegram-cleaner python=3.8
+conda activate telegram-cleaner
+
+# Get a local project copy
+git clone https://github.com/define-user/telegram-delete-all-messages
 cd telegram-delete-all-messages
+
+# Install dependencies
 pip install -r requirements.txt
-python cleaner.py
 ```
 
-### Windows
-- Download zip file from this repo and unpack it
-- Install latest [CPython 3](https://www.python.org) version
-- Run install.bat
-- Run start.bat
+In order to let the script work, you'll have to register your own
+Telegram application. To do so you need to get special credentials.
+Here are some simply steps to follow:
 
 ## Obtain standalone telegram app API credentials
-- Login to https://my.telegram.org/
+- Login to the official telegram [website](https://my.telegram.org/)
 - Select `API development tools` link
 - Create standalone application
 - Copy app_id and app_hash
@@ -27,46 +34,13 @@ python cleaner.py
 ## Usage
 > You need both App api_id and App api_hash to use script.
 
-#### Environment variables
-You could set API_ID and API_HASH environment variables to prevent entering API credentials manually.
-
 #### Start
-After starting script you will be prompted:
-- To enter your Telegram APP credentials (if no environment variables found)
-- Your account phone and then code sent to you by Telegram
+To start the script simply execute:
 ```
-$ python cleaner.py
-
-Enter your Telegram API id: 123456
-Enter your Telegram API hash: XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-Pyrogram v0.14.1, Copyright (C) 2017-2019 Dan <https://github.com/delivrance>
-Licensed under the terms of the GNU Lesser General Public License v3 or later (LGPLv3+)
-
-Enter phone number: +123456789012
-Is "+123456789012" correct? (y/n): y
-Enter phone code: 88988
-Logged in successfully as Stanislav
+python telegram-message-cleaner.py
 ```
 
-#### Choosing supergroup
-- After providing needed information you will get your supergroup dialogs
-- Enter number found near desired supergroup title
-```
-1. Python community
-2. Rust Beginners
-3. IDE & Editors
-
-Insert group number:
-```
-
-#### Message removal process
-- After choosing supergroup you would get informed about messages removal process
-```
-Insert group number: 2
-Selected Rust Beginners
-
-Searching messages. OFFSET: 0
-Found 4 your messages in selected supergroup
-Deleting 4 messages with next message IDs:
-[23807, 23799, 23757, 23756]
-```
+The script will prompt you to enter such credentials:
+- Your application credentials (required to register your app).
+- Your phone number and a code sent you by Telegram (required to
+sign in your account).

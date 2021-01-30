@@ -1,0 +1,6 @@
+# Python binaries
+__pycache__
+
+# User credentials
+client.session
+

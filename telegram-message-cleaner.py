@@ -84,22 +84,46 @@ def get_user_messages(client: Client, dialog: Dialog, user: User) -> List[Messag
     return messages
 
 
+def delete_messages(client: Client, dialog: Dialog, messages: List[Message]) -> bool:
+    """
+    This function deletes all given messages from the selected chat.
+    """
+
+    operation_statuses = list()
+
+    # The maximum number of messages that can be deleted per one request
+    # is equal to 100, though it looks like it's not stated anywhere in the documentation.
+    MAX_CHUNK_SIZE = 100
+
+    for index in range(0, len(messages), MAX_CHUNK_SIZE):
+        messages_chunk = messages[index:index + MAX_CHUNK_SIZE]
+        message_ids = [message.message_id for message in messages_chunk]
+
+        status = client.delete_messages(chat_id=dialog.chat.id, message_ids=message_ids, revoke=True)
+        operation_statuses.append(status)
+
+    return all(operation_statuses)
+
+
 if __name__ == "__main__":
     # Get required credentials to run Telegram application
     app_credentials = get_application_credentials()
 
     # Create an application instance
     with Client(session_name="client", api_id=app_credentials.api_id, api_hash=app_credentials.api_hash) as app:
+
+        # Get all user's dialogues
         available_dialogs = [dialog for dialog in app.iter_dialogs()]
+
+        # Prompt user to select a specific one
         selected_dialog = select_dialog(dialogs=available_dialogs)
 
         print("Started messages search, this step might take up to several minutes.")
         user_messages = get_user_messages(client=app, dialog=selected_dialog, user=app.get_me())
 
         print("Found", len(user_messages), "messages in selected chat")
+        status = delete_messages(client=app, dialog=selected_dialog, messages=user_messages)
 
-        message_ids = [message.message_id for message in user_messages]
-        app.delete_messages(chat_id=selected_dialog.chat.id, message_ids=message_ids, revoke=True)
-
-        print("Successfully deleted specified messages.")
+        status_message = "Successfully deleted specified messages." if status else "Some messages could not be deleted."
+        print(status_message)
 

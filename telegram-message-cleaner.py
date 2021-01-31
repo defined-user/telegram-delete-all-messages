@@ -6,10 +6,6 @@ from typing import List
 
 from pyrogram import Client
 from pyrogram.types import Dialog, Chat, User, Message
-from pyrogram.raw.functions.messages import Search
-from pyrogram.raw.types import InputPeerSelf, InputMessagesFilterEmpty
-from pyrogram.raw.types.messages import ChannelMessages
-from pyrogram.errors import FloodWait, UnknownError
 
 
 @dataclass(frozen=True)
@@ -60,7 +56,7 @@ def select_dialog(dialogs: List[Dialog]) -> Dialog:
         names_to_display = (name for name in names_to_display if name)
         names_to_display = " ".join(names_to_display)
 
-        print(f"{index}. Type: \"{dialog.chat.type}\", title: \"{names_to_display}\".")
+        print(f'{index:>4}. Type: {dialog.chat.type:>10}. Title: "{names_to_display}".')
 
     selected_number = 0
 
@@ -72,14 +68,34 @@ def select_dialog(dialogs: List[Dialog]) -> Dialog:
     return dialogs[selected_number]
 
 
-def get_user_messages(client: Client, dialog: Dialog, user: User) -> List[Message]:
+def get_user_messages(client: Client, dialog: Dialog, user: User, deep_search: bool = True) -> List[Message]:
     """
-    This function fetches all messages of a given dialog, then selects all messages,
-    that belong to a given user.
+    Search for user messages in a given chat. If `deep_search` is equal to True, then all messages
+    are fetched and checked manually. Otherwise, Telegram back-end based search is used, which is
+    much faster, but usually misses messages, if they were sent long ago or a lot of messages have
+    been deleted recently.
     """
-    # @TODO: perhaps, use a raw API to speed this up
-    messages = [message for message in client.iter_history(chat_id=dialog.chat.id)]
-    messages = [message for message in messages if message.from_user == user]
+
+    if deep_search:
+        return [message for message in client.iter_history(chat_id=dialog.chat.id) if message.from_user == user]
+
+    messages = list()
+
+    # The maximum number of messages, that can be retrieved per one search,
+    # seems to be equal to 999, though I haven't found any specific info on this.
+    MAX_CHUNK_SIZE = 500
+    current_offset = 0
+
+    while True:
+        messages_chunk = client.search_messages(
+            chat_id=dialog.chat.id, offset=current_offset, limit=MAX_CHUNK_SIZE, from_user=user.id
+        )
+
+        if len(messages_chunk) == 0:
+            break
+
+        messages.extend(messages_chunk)
+        current_offset += MAX_CHUNK_SIZE
 
     return messages
 
@@ -91,12 +107,12 @@ def delete_messages(client: Client, dialog: Dialog, messages: List[Message]) -> 
 
     operation_statuses = list()
 
-    # The maximum number of messages that can be deleted per one request
+    # The maximum number of messages, that can be deleted per one request,
     # is equal to 100, though it looks like it's not stated anywhere in the documentation.
     MAX_CHUNK_SIZE = 100
 
     for index in range(0, len(messages), MAX_CHUNK_SIZE):
-        messages_chunk = messages[index:index + MAX_CHUNK_SIZE]
+        messages_chunk = messages[index : index + MAX_CHUNK_SIZE]
         message_ids = [message.message_id for message in messages_chunk]
 
         status = client.delete_messages(chat_id=dialog.chat.id, message_ids=message_ids, revoke=True)

@@ -1,11 +1,13 @@
 import configparser
 import os
-from time import sleep
 from dataclasses import dataclass
 from typing import List
 
 from pyrogram import Client
 from pyrogram.types import Dialog, Chat, User, Message
+
+
+WORKING_DIRECTORY = os.path.join(os.path.dirname(__file__), "sessions")
 
 
 @dataclass(frozen=True)
@@ -125,8 +127,16 @@ if __name__ == "__main__":
     # Get required credentials to run Telegram application
     app_credentials = get_application_credentials()
 
+    # @TODO: add ability to specify session name in a config file or as an environment variable
+    app = Client(
+        session_name="client",
+        api_id=app_credentials.api_id,
+        api_hash=app_credentials.api_hash,
+        workdir=WORKING_DIRECTORY,
+    )
+
     # Create an application instance
-    with Client(session_name="client", api_id=app_credentials.api_id, api_hash=app_credentials.api_hash) as app:
+    with app:
 
         # Get all user's dialogues
         available_dialogs = [dialog for dialog in app.iter_dialogs()]

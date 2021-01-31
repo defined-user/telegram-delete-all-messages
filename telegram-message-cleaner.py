@@ -1,95 +1,105 @@
+import configparser
+import os
 from time import sleep
+from dataclasses import dataclass
 from typing import List
 
 from pyrogram import Client
+from pyrogram.types import Dialog, Chat, User, Message
 from pyrogram.raw.functions.messages import Search
 from pyrogram.raw.types import InputPeerSelf, InputMessagesFilterEmpty
 from pyrogram.raw.types.messages import ChannelMessages
 from pyrogram.errors import FloodWait, UnknownError
 
 
-def get_dialog_list(telegram_application):
-    dialogs = list()
-    chunk_of_dialogs = telegram_application.get_dialogs()
-
-    while len(chunk_of_dialogs) > 0:
-        dialogs.extend(chunk_of_dialogs)
-        chunk_of_dialogs = telegram_application.get_dialogs(offset_date=dialogs[-1].top_message.date)
-
-    return dialogs
+@dataclass(frozen=True)
+class ApplicationCredentials:
+    api_id: int
+    api_hash: str
 
 
-def get_message_list(telegram_application, selected_group):
-    peer = telegram_application.resolve_peer(selected_group.chat.id)
+def get_application_credentials() -> ApplicationCredentials:
+    """
+    This function retrieves application credentials. It looks for them in such order:
+      - From a config file, path to which is stored under `$TELEGRAM_APPLICATION_CREDENTIALS` environment variable.
+      - From a config file, located in current directory.
+      - From both `$TGAPP_ID` and `$TGAPP_HASH` environment variables.
+      - From direct user input.
+    """
 
-    messages_response = telegram_application.send(
-        Search(
-            peer=peer,
-            q="",
-            filter=InputMessagesFilterEmpty(),
-            min_date=0,
-            max_date=0,
-            offset_id=0,
-            add_offset=0,
-            max_id=0,
-            min_id=0,
-            limit=2_147_483_647,
-            hash=0,
-            from_id=InputPeerSelf(),
-        )
-    )
+    path_to_config = os.getenv(key="TELEGRAM_APPLICATION_CREDENTIALS", default=None)
 
-    return messages_response["messages"]
+    if not path_to_config:
+        path_to_config = os.path.join(os.path.dirname(__file__), "config.ini")
+        path_to_config = path_to_config if os.path.exists(path=path_to_config) else None
+
+    if path_to_config:
+        config = configparser.ConfigParser()
+        config.read(filenames=path_to_config)
+
+        return ApplicationCredentials(api_id=int(config["pyrogram"]["api_id"]), api_hash=config["pyrogram"]["api_hash"])
+
+    api_id, api_hash = os.getenv(key="TGAPP_ID", default=None), os.getenv(key="TGAPP_HASH", default=None)
+
+    if not api_id or not api_hash:
+        api_id, api_hash = int(input("Enter your api_id: ")), input("Enter your api_hash: ")
+
+    return ApplicationCredentials(api_id=api_id, api_hash=api_hash)
+
+
+def select_dialog(dialogs: List[Dialog]) -> Dialog:
+    """
+    This function displays all dialogues to user, then lets them select a specific one,
+    in order to keep working on it.
+    """
+
+    print("Available dialogues:")
+
+    for index, dialog in enumerate(dialogs, start=1):
+        names_to_display = [dialog.chat.title, dialog.chat.first_name, dialog.chat.last_name]
+        names_to_display = (name for name in names_to_display if name)
+        names_to_display = " ".join(names_to_display)
+
+        print(f"{index}. Type: \"{dialog.chat.type}\", title: \"{names_to_display}\".")
+
+    selected_number = 0
+
+    while selected_number <= 0 or selected_number > len(dialogs):
+        selected_number = int(input("Select a chat by it's unique number: "))
+
+    selected_number -= 1
+
+    return dialogs[selected_number]
+
+
+def get_user_messages(client: Client, dialog: Dialog, user: User) -> List[Message]:
+    """
+    This function fetches all messages of a given dialog, then selects all messages,
+    that belong to a given user.
+    """
+    # @TODO: perhaps, use a raw API to speed this up
+    messages = [message for message in client.iter_history(chat_id=dialog.chat.id)]
+    messages = [message for message in messages if message.from_user == user]
+
+    return messages
+
 
 if __name__ == "__main__":
     # Get required credentials to run Telegram application
-    api_id = int(input("Enter your app_id: "))
-    api_hash = input("Enter your app_hash: ")
+    app_credentials = get_application_credentials()
 
     # Create an application instance
-    app = Client("client", api_id=api_id, api_hash=api_hash)
-    app.start()
+    with Client(session_name="client", api_id=app_credentials.api_id, api_hash=app_credentials.api_hash) as app:
+        available_dialogs = [dialog for dialog in app.iter_dialogs()]
+        selected_dialog = select_dialog(dialogs=available_dialogs)
 
-    try:
-        group_type = "group" if input("Select a group (n - to select a supergroup) [Y/n]: ") != 'n' else "supergroup"
+        print("Started messages search, this step might take up to several minutes.")
+        user_messages = get_user_messages(client=app, dialog=selected_dialog, user=app.get_me())
 
-        # Get all user's chats of a selected type
-        available_dialogs = get_dialog_list(telegram_application=app)
-        available_dialogs = [dialog for dialog in available_dialogs if dialog.chat.type == group_type]
+        print("Found", len(user_messages), "messages in selected chat")
 
-        # Select required chat
-        print(f"Available {group_type}s:")
-        for index, group_dialog in enumerate(available_dialogs, start=1):
-            print(f"{index}. {group_dialog.chat.title}")
+        message_ids = [message.message_id for message in user_messages]
+        app.delete_messages(chat_id=selected_dialog.chat.id, message_ids=message_ids, revoke=True)
 
-        selected_group_number = int(input("Enter a number of a group to delete messages in: "))
-        selected_group_number -= 1
+        print("Successfully deleted specified messages.")
 
-        if selected_group_number < 0 or selected_group_number >= len(available_dialogs):
-            print("Invalid group number selected.")
-            exit(1)
-
-        selected_group = available_dialogs[selected_group_number]
-
-        # Get a list of messages
-        messages = get_message_list(telegram_application=app, selected_group=selected_group)
-        message_ids = [message.id for message in messages]
-
-        # Delete all messages
-        print(f"Deleting {len(messages)} messages.")
-
-        for index in range(0, len(message_ids), 100):
-            try:
-                ids_chunk = message_ids[index:index + 100]
-                app.delete_messages(chat_id=selected_group.chat.id, message_ids=ids_chunk)
-            except FloodWait as fe:
-                print(f"Small pause to avoid flooding Telegram servers: {fe}")
-                sleep(fe.x)
-
-        print("Done.")
-
-    except UnknownError as ur:
-        print(f"An error occurred during execution: {ur}. Leaving...")
-
-    # Stop the application, otherwise, a leak will occur
-    app.stop()

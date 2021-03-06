@@ -8,3 +8,6 @@ sessions/*
 # User application credentials
 config.ini
 
+# IDE/editor related files
+.idea
+.vscode

@@ -1,4 +1,0 @@
-pyrogram
-# Optional dependency, used for faster cleaning
-tgcrypto 
-

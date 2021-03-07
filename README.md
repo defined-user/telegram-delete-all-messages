@@ -5,20 +5,19 @@ Delete all your messages in groups and supergroups with python script.
 To use this script you have to download the project and install it's
 requirements. It's recommended to use a virtual environment, such as
 `venv` or `conda`. This example shows how to setup your project
-using `conda`:
+using `pyenv` and `Poetry`:
 
 ### Linux
 ```
-# Create a new Python 3.8 environment
-conda create -n telegram-cleaner python=3.8
-conda activate telegram-cleaner
-
 # Get a local project copy
 git clone https://github.com/define-user/telegram-delete-all-messages
 cd telegram-delete-all-messages
 
+# Install Python 3.9.2
+pyenv install 3.9.2
+
 # Install dependencies
-pip install -r requirements.txt
+poetry install
 ```
 
 In order to let the script work, you'll have to register your own
@@ -37,6 +36,9 @@ Here are some simply steps to follow:
 #### Start
 To start the script simply execute:
 ```
+# Enter your venv
+poetry shell
+# Run programme interactively
 python telegram-message-cleaner.py
 ```
 
